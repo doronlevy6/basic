@@ -16,10 +16,6 @@ const providers = JSON.parse(fs.readFileSync(path.join(__dirname, '../providers/
 
 app.get('/appointments', (req, res) => {
     const { specialty, date, minScore } = req.query;
-    console.log('\n\n\n date', date, '\n\n\n ');
-
-
-
 
     if (!specialty || !date || isNaN(+date)) {
         return res.status(400).send('Bad Request');
@@ -40,7 +36,7 @@ app.get('/appointments', (req, res) => {
 
     // Order by score and send the names only
     const orderedResults = results.sort((a, b) => b.score - a.score).map(provider => provider.name);
-    console.log('\n\n\n orderedResults', orderedResults, '\n\n\n ');
+
 
     res.json(orderedResults);
 });
