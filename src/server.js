@@ -5,15 +5,34 @@ const app = express();
 
 const PORT = 3500;
 
-// Parsing JSON bodies for POST
 app.use(express.json());
 
+// Utility Functions
+function loadProvidersData() {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, '../providers/providers.json'), 'utf8'));
+}
 
-// Load providers data
+function hasSpecialty(provider, specialty) {
+    return provider.specialties.some(spec => spec.toLowerCase() === specialty.toLowerCase());
+}
 
-const providers = JSON.parse(fs.readFileSync(path.join(__dirname, '../providers/providers.json'), 'utf8'));
+function isAvailable(provider, date) {
+    return provider.availableDates.some(d => d.from <= +date && d.to >= +date);
+}
 
+function meetsScore(provider, minScore) {
+    return provider.score >= (minScore ? +minScore : 0);
+}
 
+function filterProviders(providers, specialty, date, minScore) {
+    return providers.filter(provider =>
+        hasSpecialty(provider, specialty) &&
+        isAvailable(provider, date) &&
+        meetsScore(provider, minScore)
+    ).sort((a, b) => b.score - a.score).map(provider => provider.name);
+}
+
+// Route Handlers
 app.get('/appointments', (req, res) => {
     const { specialty, date, minScore } = req.query;
 
@@ -21,41 +40,27 @@ app.get('/appointments', (req, res) => {
         return res.status(400).send('Bad Request');
     }
 
-    const results = providers.filter(provider => {
-        // Check specialty
-        const hasSpecialty = provider.specialties.some(spec => spec.toLowerCase() === specialty.toLowerCase());
+    const providers = loadProvidersData();
+    const results = filterProviders(providers, specialty, date, minScore);
 
-        // Check availability
-        const isAvailable = provider.availableDates.some(d => d.from <= +date && d.to >= +date);
-
-        // Check score
-        const hasMinScore = provider.score >= +minScore;
-
-        return hasSpecialty && isAvailable && hasMinScore;
-    });
-
-    // Order by score and send the names only
-    const orderedResults = results.sort((a, b) => b.score - a.score).map(provider => provider.name);
-
-
-    res.json(orderedResults);
+    res.json(results);
 });
 
 app.post('/appointments', (req, res) => {
     const { name, date } = req.body;
 
+    const providers = loadProvidersData();
     const provider = providers.find(p => p.name === name);
+
     if (!provider) {
         return res.status(400).send('Provider not found');
     }
 
-    const isAvailable = provider.availableDates.some(d => d.from <= +date && d.to >= +date);
-    if (!isAvailable) {
+    if (!isAvailable(provider, date)) {
         return res.status(400).send('Provider is not available at this time');
     }
 
-    // Here you can add logic to save the appointment, like writing to a database or another file.
-    // For now, let's just return a successful message.
+    // Here you can add logic to save the appointment.
     res.send('Appointment set successfully');
 });
 
@@ -63,3 +68,4 @@ app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
 
+module.exports = app;
