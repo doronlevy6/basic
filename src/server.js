@@ -6,10 +6,19 @@ const app = express();
 const PORT = 3500;
 
 app.use(express.json());
+app.use((req, res, next) => {
+    console.log(`Incoming request: ${req.method} ${req.url}`);
+    next();
+});
 
 // Utility Functions
 function loadProvidersData() {
-    return JSON.parse(fs.readFileSync(path.join(__dirname, '../providers/providers.json'), 'utf8'));
+    try {
+        return JSON.parse(fs.readFileSync(path.join(__dirname, '../providers/providers.json'), 'utf8'));
+    } catch (error) {
+        console.error("Error loading provider data:", error);
+        throw error; // Rethrow to handle it in the calling context
+    }
 }
 
 function hasSpecialty(provider, specialty) {
@@ -33,35 +42,51 @@ function filterProviders(providers, specialty, date, minScore) {
 }
 
 // Route Handlers
-app.get('/appointments', (req, res) => {
-    const { specialty, date, minScore } = req.query;
+app.get('/appointments', (req, res, next) => {
+    try {
+        const { specialty, date, minScore } = req.query;
 
-    if (!specialty || !date || isNaN(+date)) {
-        return res.status(400).send('Bad Request');
+        if (!specialty || !date || isNaN(+date)) {
+
+            return res.status(400).send('Bad Request');
+        }
+
+        const providers = loadProvidersData();
+        const results = filterProviders(providers, specialty, date, minScore);
+
+        res.json(results);
+    } catch (error) {
+        next(error); // Pass errors to the error handling middleware
     }
-
-    const providers = loadProvidersData();
-    const results = filterProviders(providers, specialty, date, minScore);
-
-    res.json(results);
 });
 
-app.post('/appointments', (req, res) => {
-    const { name, date } = req.body;
+app.post('/appointments', (req, res, next) => {
+    try {
+        const { name, date } = req.body;
 
-    const providers = loadProvidersData();
-    const provider = providers.find(p => p.name === name);
+        const providers = loadProvidersData();
+        const provider = providers.find(p => p.name === name);
 
-    if (!provider) {
-        return res.status(400).send('Provider not found');
+        if (!provider) {
+
+            return res.status(400).send('Provider not found');
+        }
+
+        if (!isAvailable(provider, date)) {
+            return res.status(400).send('Provider is not available at this time');
+        }
+
+        // Save appointment logic here
+
+        res.send('Appointment set successfully');
+    } catch (error) {
+        next(error); // Pass errors to the error handling middleware
     }
+});
 
-    if (!isAvailable(provider, date)) {
-        return res.status(400).send('Provider is not available at this time');
-    }
-
-    // Here you can add logic to save the appointment.
-    res.send('Appointment set successfully');
+app.use((err, req, res, next) => {
+    console.error("222", err);
+    res.status(500).send('Internal Server Error');
 });
 
 app.listen(PORT, () => {
