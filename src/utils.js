@@ -27,10 +27,21 @@ function filterProviders(providers, specialty, date, minScore) {
         meetsScore(provider, minScore)
     ).sort((a, b) => b.score - a.score).map(provider => provider.name);
 }
+function isValidTimestamp(timestamp) {
+    const date = new Date(+timestamp);
+    return !isNaN(date.getTime());
+}
+
+
+
+
+
+
 module.exports = {
     loadProvidersData,
     hasSpecialty,
     isAvailable,
     meetsScore,
-    filterProviders
+    filterProviders, isValidTimestamp,
+
 };
